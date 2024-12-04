@@ -1,0 +1,103 @@
+name: 'Semver Label Tag Push Image'
+description: 'Automatically version, label, tag and push Docker images using semantic versioning'
+inputs:
+  registry:
+    description: 'Container registry to push to'
+    required: true
+    default: 'ghcr.io'
+  org_name:
+    description: 'Organization name for the image'
+    required: true
+  image_name:
+    description: 'Name of the image'
+    required: true
+  image_title:
+    description: 'Title of the image for OCI labels'
+    required: true
+  image_description:
+    description: 'Description of the image for OCI labels'
+    required: true
+  version_increment:
+    description: 'Version increment type (major, minor, patch)'
+    required: true
+    default: 'patch'
+  release_branch:
+    description: 'Branch to use for versioning'
+    required: true
+    default: 'main'
+  registry_username:
+    description: 'Username for registry authentication'
+    required: false
+    default: '${{ github.actor }}'
+  registry_password:
+    description: 'Password for registry authentication (e.g., GITHUB_TOKEN)'
+    required: true
+  dockerfile:
+    description: 'Path to the Dockerfile'
+    required: false
+    default: './Dockerfile'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get next version
+      uses: reecetech/version-increment@2024.10.1
+      id: version
+      with:
+        release_branch: ${{ inputs.release_branch }}
+        scheme: semver
+        increment: ${{ inputs.version_increment }}
+
+    - name: Get Git commit and build date
+      id: git_info
+      shell: bash
+      run: |
+        echo "GIT_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+    - name: Define IMAGE_FULL_NAME and IMAGE_TAG
+      id: image_info
+      shell: bash
+      run: |
+        echo "IMAGE_FULL_NAME=${{ inputs.registry }}/${{ inputs.org_name }}/${{ inputs.image_name }}" >> $GITHUB_OUTPUT
+        echo "IMAGE_TAG=v${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.registry_username }}
+        password: ${{ inputs.registry_password }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract metadata (tags, labels) for container build
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ steps.image_info.outputs.IMAGE_FULL_NAME }}
+        tags: |
+          type=raw,value=v${{ steps.version.outputs.version }}
+          type=raw,value=dev-latest
+        labels: |
+          org.opencontainers.image.title=${{ inputs.image_title }}
+          org.opencontainers.image.description=${{ inputs.image_description }}
+          org.opencontainers.image.url=https://github.com/${{ github.repository }}
+          org.opencontainers.image.version=${{ steps.image_info.outputs.IMAGE_TAG }}
+          org.opencontainers.image.created=${{ steps.git_info.outputs.BUILD_DATE }}
+          org.opencontainers.image.revision=${{ steps.git_info.outputs.GIT_COMMIT }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ${{ inputs.dockerfile }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}

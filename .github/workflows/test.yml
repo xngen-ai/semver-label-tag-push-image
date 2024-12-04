@@ -1,0 +1,66 @@
+name: Test Action
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test Dockerfile
+        run: |
+          echo "FROM alpine:latest" > Dockerfile
+          echo "CMD ['echo', 'Hello World']" >> Dockerfile
+
+      - name: Test action with minimal inputs
+        uses: ./
+        with:
+          registry: 'ghcr.io'
+          org_name: ${{ github.repository_owner }}
+          image_name: 'test-image'
+          image_title: 'Test Image'
+          image_description: 'Test Description'
+          version_increment: 'patch'
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
+
+  test-input-validation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version_increment: ['invalid', 'patch', 'minor', 'major']
+        should_fail: [true, false, false, false]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test Dockerfile
+        run: |
+          echo "FROM alpine:latest" > Dockerfile
+          echo "CMD ['echo', 'Hello World']" >> Dockerfile
+
+      - name: Test version increment validation
+        uses: ./
+        continue-on-error: ${{ matrix.should_fail }}
+        with:
+          registry: 'ghcr.io'
+          org_name: ${{ github.repository_owner }}
+          image_name: 'test-image'
+          image_title: 'Test Image'
+          image_description: 'Test Description'
+          version_increment: ${{ matrix.version_increment }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify expected outcome
+        if: ${{ matrix.should_fail }}
+        run: |
+          if [ ${{ job.status }} != 'failure' ]; then
+            echo "Test should have failed but didn't"
+            exit 1
+          fi 
