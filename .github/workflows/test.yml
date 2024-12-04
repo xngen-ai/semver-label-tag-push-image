@@ -30,8 +30,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version_increment: ['invalid', 'patch', 'minor', 'major']
-        should_fail: [true, false, false, false]
+        include:
+          - version_increment: 'invalid'
+            should_fail: true
+          - version_increment: 'patch'
+            should_fail: false
+          - version_increment: 'minor'
+            should_fail: false
+          - version_increment: 'major'
+            should_fail: false
 
     steps:
       - uses: actions/checkout@v4
