@@ -60,6 +60,7 @@ jobs:
           image_description: 'Test Description'
           version_increment: ${{ matrix.version_increment }}
           registry_password: ${{ secrets.GITHUB_TOKEN }}
+          dockerfile: './test/Dockerfile'
 
       - name: Verify expected outcome
         if: ${{ matrix.should_fail }}
