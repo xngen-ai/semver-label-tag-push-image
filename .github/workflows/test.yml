@@ -60,7 +60,7 @@ jobs:
       - name: Verify expected outcome
         if: ${{ matrix.should_fail }}
         run: |
-          if [ ${{ job.status }} != 'failure' ]; then
+          if [ "${{ job.status }}" != "failure" ]; then
             echo "Test should have failed but didn't"
             exit 1
           fi 
