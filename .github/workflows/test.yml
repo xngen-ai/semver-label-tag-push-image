@@ -46,6 +46,7 @@ jobs:
           echo "CMD ['echo', 'Hello World']" >> Dockerfile
 
       - name: Test version increment validation
+        id: test-version-increment-validation
         uses: ./
         continue-on-error: ${{ matrix.should_fail }}
         with:
@@ -60,7 +61,7 @@ jobs:
       - name: Verify expected outcome
         if: ${{ matrix.should_fail }}
         run: |
-          if [ "${{ job.status }}" != "failure" ]; then
+          if [ "${{ steps.test-version-increment-validation.outcome }}" != "failure" ]; then
             echo "Test should have failed but didn't"
             exit 1
           fi 
